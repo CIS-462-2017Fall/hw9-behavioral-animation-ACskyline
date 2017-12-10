@@ -180,10 +180,13 @@ void BehaviorController::control(double deltaT)
 		m_force = vec3(0,0,1) * gMass * gVelKv * (m_vd - m_state[VEL][_Z]);
 		//m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (m_thetad - m_state[ORI][_Y]));
 
+		//std::cout << m_state[AVEL][_Y] << ","   << m_thetad << "," << m_state[ORI][_Y] << "====";
+
 		double temp = m_thetad - m_state[ORI][_Y];
 
 		double temp2 = m_thetad - m_state[ORI][_Y];
 
+		//my way is not right, because m_state[ORI][_Y] is not guaranteed to be within (-Pi,Pi), even though m_thetad is.
 		double sign = temp >= 0 ? 1 : -1;
 		temp = abs(temp);
 		if (temp>M_PI)
@@ -196,7 +199,11 @@ void BehaviorController::control(double deltaT)
 
 		m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (temp2));
 
-		//m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (m_thetad - m_state[ORI][_Y]));
+		//m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (m_thetad - m_state[ORI][_Y]));//my way is wrong
+
+		//std::cout << m_thetad - m_state[ORI][_Y] <<  "-->" << temp2 << std::endl;
+
+		//std::cout << m_state[AVEL][_Y] << "-->" << temp2 << "-->" << m_torque << std::endl;
 
 		// when agent desired agent velocity and actual velocity < 2.0 then stop moving
 		if (m_vd < 2.0 &&  m_state[VEL][_Z] < 2.0)

@@ -1,4 +1,5 @@
-﻿  aBehaviorController.cpp
+﻿  aBehaviors.cpp
+aBehaviors.cpp(254): warning C4018: '<': signed/unsigned mismatch
   libassignment5.vcxproj -> E:\Documents\CIS-562\homework_9\hw09\hw9-behavioral-animation-ACskyline\HW9 - AnimationToolkit - 2017\libsrc\animation\..\..\lib\libassignment5d.lib
   aActor.h
   aBehaviorController.h
