@@ -9,7 +9,6 @@
 #include "GL/glut.h"
 
 
-
 #define Truncate(a, b, c) (a = max<double>(min<double>(a,c),b))
 
 double BehaviorController::gMaxSpeed = 1000.0; 
@@ -29,9 +28,13 @@ double BehaviorController::KNoise = 15.0;
 double BehaviorController::KWander = 80.0;   
 double BehaviorController::KAvoid = 600.0;  
 double BehaviorController::TAvoid = 1000.0;   
-double BehaviorController::KSeparation = 12000.0; 
+double BehaviorController::KSeparation = 12000.0;
 double BehaviorController::KAlignment = 1.0;  
 double BehaviorController::KCohesion = 1.0;  
+
+
+//???
+double BehaviorController::RNeighborhood = 10000.0;
 
 const double M2_PI = M_PI * 2.0;
 
@@ -147,32 +150,53 @@ void BehaviorController::sense(double deltaT)
 void BehaviorController::control(double deltaT)
 // Given the active behavior this function calculates a desired velocity vector (Vdesired).  
 // The desired velocity vector is then used to compute the desired speed (vd) and direction (thetad) commands
-
 {
 
 	if (mpActiveBehavior)
 	{ 
 		m_Vdesired = mpActiveBehavior->calcDesiredVel(this);
+
+		//std::cout << "vd:" << m_Vdesired << std::endl;
+
 		m_Vdesired[1] = 0;
 
 		//  force and torque inputs are computed from vd and thetad as follows:
 		//              Velocity P controller : force = mass * Kv * (vd - v)
-		//              Heading PD controller : torque = Inertia * (-Kv * thetaDot -Kp * (thetad - theta))
+		//              Heading PD controller : torque = Inertia * (-Kv * thetaDot + Kp * (thetad - theta))
 		//  where the values of the gains Kv and Kp are different for each controller
 
 		// TODO: insert your code here to compute m_force and m_torque
 
 
+		m_vd = m_Vdesired.Length();
+		vec3 dir = m_Vdesired;
+		dir.Normalize();
+		m_thetad = atan2(dir[_X], dir[_Z]);
+
+		gVelKv = 10;
+		gOriKv = 32;
+		gOriKp = 256;
+
+		m_force = vec3(0,0,1) * gMass * gVelKv * (m_vd - m_state[VEL][_Z]);
+		//m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (m_thetad - m_state[ORI][_Y]));
+
+		double temp = m_thetad - m_state[ORI][_Y];
+
+		double temp2 = m_thetad - m_state[ORI][_Y];
+
+		double sign = temp >= 0 ? 1 : -1;
+		temp = abs(temp);
+		if (temp>M_PI)
+		{
+			m_thetad = m_state[ORI][_Y] - sign * (M2_PI - temp);
+		}
 
 
+		ClampAngle(temp2);
 
+		m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (temp2));
 
-
-
-
-
-
-
+		//m_torque = vec3(0, 1, 0) * gInertia * (-gOriKv * m_state[AVEL][_Y] + gOriKp * (m_thetad - m_state[ORI][_Y]));
 
 		// when agent desired agent velocity and actual velocity < 2.0 then stop moving
 		if (m_vd < 2.0 &&  m_state[VEL][_Z] < 2.0)
@@ -186,6 +210,8 @@ void BehaviorController::control(double deltaT)
 		m_force[2] = 0.0;
 		m_torque[1] = 0.0;
 	}
+
+	/*std::cout << "force:" << m_force << std::endl;*/
 
 	// set control inputs to current force and torque values
 	m_controlInput[0] = m_force;
@@ -212,10 +238,12 @@ void BehaviorController::computeDynamics(vector<vec3>& state, vector<vec3>& cont
 	// Compute the stateDot vector given the values of the current state vector and control input vector
 	// TODO: add your code here
 
+	stateDot[0] = mat3::Rotation3D(axisY, m_state[ORI][_Y]) * (state[2] + stateDot[2] * deltaT);
+	stateDot[1] = state[3] + stateDot[3] * deltaT;
+	stateDot[2] = force / gMass;
+	stateDot[3] = torque / gInertia;
 
-
-
-
+	//std::cout << "m_Vel0:" << stateDot[0] << " m_AVelB:" << stateDot[1] << " bA:" << stateDot[2] << " bAA:" << stateDot[3] << std::endl;
 }
 
 void BehaviorController::updateState(float deltaT, int integratorType)
@@ -225,11 +253,23 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 
 	// TODO: add your code here
 	
-
-
-
-
-
+	switch (integratorType)
+	{
+	case 0://Euler
+		m_state[0] += m_stateDot[0] * deltaT;
+		m_state[1] += m_stateDot[1] * deltaT;
+		m_state[2] += m_stateDot[2] * deltaT;
+		m_state[3] += m_stateDot[3] * deltaT;
+		break;
+	case 1://RK2
+		m_state[0] += (m_stateDot[0] + m_stateDot[0] + mat3::Rotation3D(axisY, m_state[ORI][_Y]) * m_stateDot[2] * deltaT) * deltaT / 2.f;
+		m_state[1] += (m_stateDot[1] + m_stateDot[1] + m_stateDot[3] * deltaT) * deltaT / 2.f;
+		m_state[2] += (m_stateDot[2] + m_force / gMass * deltaT) * deltaT / 2.f;
+		m_state[3] += (m_stateDot[3] + m_torque / gInertia * deltaT) * deltaT / 2.f;
+		break;
+	default :
+		break;
+	}
 
 
 	//  given the new values in m_state, these are the new component state values 
@@ -238,14 +278,18 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 	m_VelB = m_state[VEL];
 	m_AVelB = m_state[AVEL];
 
+	//???????????????????????
+	m_Vel0 = m_stateDot[0];//?shouldn't there be something like this?????????????????????
+	//???????????????????????
+
 	//  Perform validation check to make sure all values are within MAX values
 	// TODO: add your code here
 
+	if (m_VelB.Length() > gMaxSpeed) m_VelB = gMaxSpeed * m_VelB.Normalize();
+	if (m_AVelB.Length() > gMaxAngularSpeed) m_AVelB = gMaxAngularSpeed * m_AVelB.Normalize();
 
-
-
-
-
+	if (m_force.Length() > gMaxForce) m_force = gMaxForce * m_force.Normalize();
+	if (m_torque.Length() > gMaxTorque) m_torque = gMaxTorque * m_torque.Normalize();
 
 
 	// update the guide orientation
@@ -255,7 +299,7 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 	{
 		dir = m_lastVel0;
 		dir.Normalize();;
-		m_state[ORI] = atan2(dir[_Z], dir[_X]);
+		m_state[ORI] = atan2(dir[_X], dir[_Z]);
 	}
 	else
 	{
@@ -325,7 +369,7 @@ void BehaviorController::display()
 
 	glPushMatrix();
 	glTranslatef(pos[0], pos[1], pos[2]);
-	glRotatef(90 - angle[1], 0, 1, 0);
+	glRotatef(angle[1], 0, 1, 0);
 	glutSolidCone(40, 80, 10, 10);
 	glutSolidSphere(35, 10, 10);
 	glPopMatrix();

@@ -1,2 +1,2 @@
-#TargetFrameworkVersion=v4.0:PlatformToolSet=v140:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=8.1
-Debug|Win32|D:\MyHomeWork\HW9_BehavioralAnimation\HW9 - AnimationToolkit - 2017\|
+#TargetFrameworkVersion=v4.0:PlatformToolSet=v141:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=10.0.15063.0
+Debug|Win32|E:\Documents\CIS-562\homework_9\hw09\hw9-behavioral-animation-ACskyline\HW9 - AnimationToolkit - 2017\|
